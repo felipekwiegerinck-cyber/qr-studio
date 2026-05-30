@@ -880,11 +880,9 @@ const typeInputs = {
   `,
   whatsapp: `
     <label>Número do WhatsApp (com DDD e DDI)</label>
-    <input type="text" id="main-input" placeholder="+55 11 99999-9999">
-    <div style="margin-top:10px;">
-      <label>Mensagem pré-definida (opcional)</label>
-      <textarea id="wa-message" rows="3" placeholder="Olá, entrei em contato pelo QR Code..."></textarea>
-    </div>
+    <input type="text" id="main-input" placeholder="+55 11 99999-9999" style="margin-bottom:10px;">
+    <label>Mensagem pré-definida (opcional)</label>
+    <textarea id="wa-message" rows="3" placeholder="Olá, entrei em contato pelo QR Code..."></textarea>
   `,
   wifi: `
     <label>Nome da rede (SSID)</label>
@@ -928,48 +926,63 @@ const typeInputs = {
   `
 };
 
+function getVal(id) {
+  const el = document.getElementById(id);
+  return el ? el.value.trim() : '';
+}
+
 function getContent() {
   const type = state.type;
-  const main = document.getElementById('main-input');
-  const val = main ? main.value.trim() : '';
 
-  if (type === 'url' || type === 'pdf' || type === 'pptx' || type === 'youtube') return val;
-  if (type === 'text') return val;
-  if (type === 'phone') return `tel:${val}`;
+  if (type === 'url' || type === 'pdf' || type === 'pptx' || type === 'youtube') {
+    return getVal('main-input');
+  }
+  if (type === 'text') {
+    return getVal('main-input');
+  }
+  if (type === 'phone') {
+    const phone = getVal('main-input');
+    return phone ? `tel:${phone}` : '';
+  }
   if (type === 'instagram') {
-    const user = val.replace('@','');
-    return `https://instagram.com/${user}`;
+    const user = getVal('main-input').replace('@','');
+    return user ? `https://instagram.com/${user}` : '';
   }
   if (type === 'email') {
-    const to = (document.getElementById('email-to')||{value:''}).value.trim();
-    const subject = encodeURIComponent((document.getElementById('email-subject')||{value:''}).value.trim());
-    const body = encodeURIComponent(val);
+    const to = getVal('email-to');
+    if (!to) return '';
+    const subject = encodeURIComponent(getVal('email-subject'));
+    const body = encodeURIComponent(getVal('main-input'));
     return `mailto:${to}?subject=${subject}&body=${body}`;
   }
   if (type === 'whatsapp') {
-    const phone = val.replace(/\D/g,'');
-    const msg = encodeURIComponent((document.getElementById('wa-message')||{value:''}).value.trim());
+    const phone = getVal('main-input').replace(/\D/g,'');
+    if (!phone) return '';
+    const msg = encodeURIComponent(getVal('wa-message'));
     return `https://wa.me/${phone}?text=${msg}`;
   }
   if (type === 'wifi') {
-    const ssid = (document.getElementById('wifi-ssid')||{value:''}).value.trim();
-    const pass = (document.getElementById('wifi-pass')||{value:''}).value.trim();
-    const sec = val;
+    const ssid = getVal('wifi-ssid');
+    if (!ssid) return '';
+    const pass = getVal('wifi-pass');
+    const sec = getVal('main-input') || 'WPA';
     return `WIFI:T:${sec};S:${ssid};P:${pass};;`;
   }
   if (type === 'vcard') {
-    const name = (document.getElementById('vc-name')||{value:''}).value.trim();
-    const phone = (document.getElementById('vc-phone')||{value:''}).value.trim();
-    const email = (document.getElementById('vc-email')||{value:''}).value.trim();
-    const org = val;
+    const name = getVal('vc-name');
+    if (!name) return '';
+    const phone = getVal('vc-phone');
+    const email = getVal('vc-email');
+    const org = getVal('main-input');
     return `BEGIN:VCARD\nVERSION:3.0\nFN:${name}\nTEL:${phone}\nEMAIL:${email}\nORG:${org}\nEND:VCARD`;
   }
   if (type === 'location') {
-    const lat = (document.getElementById('loc-lat')||{value:''}).value.trim();
-    const lng = val;
+    const lat = getVal('loc-lat');
+    const lng = getVal('main-input');
+    if (!lat || !lng) return '';
     return `geo:${lat},${lng}`;
   }
-  return val;
+  return getVal('main-input');
 }
 
 // ---- Render input ----
