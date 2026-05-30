@@ -844,31 +844,39 @@ const typeInputs = {
     <textarea id="main-input" rows="4" placeholder="Digite qualquer texto..."></textarea>
   `,
   pdf: `
-    <label>Arquivo PDF</label>
-    <div style="margin-bottom:12px;">
-      <label style="margin-bottom:4px;">ou link direto para PDF</label>
-      <input type="url" id="main-input" placeholder="https://exemplo.com/arquivo.pdf">
+    <div style="margin-bottom:16px;">
+      <label>Opção 1 — Link direto para o PDF</label>
+      <input type="url" id="main-input" placeholder="https://exemplo.com/arquivo.pdf" style="margin-top:6px;">
     </div>
-    <div class="file-upload" id="file-zone">
-      <input type="file" id="file-input" accept=".pdf">
-      <div class="file-upload-icon">📄</div>
-      <div class="file-upload-text">Arraste ou <strong>clique para escolher</strong> um PDF</div>
-      <div class="file-name" id="file-display"></div>
+    <div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:12px;">— ou —</div>
+    <div>
+      <label>Opção 2 — Upload do arquivo PDF</label>
+      <div class="file-upload" id="file-zone" style="margin-top:6px;">
+        <input type="file" id="file-input" accept=".pdf">
+        <div class="file-upload-icon">📄</div>
+        <div class="file-upload-text">Arraste ou <strong>clique para escolher</strong> um PDF</div>
+        <div class="file-name" id="file-display"></div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:8px;">⚠️ Arquivos grandes podem gerar QR codes densos. Prefira usar um link (Google Drive, Dropbox etc).</div>
     </div>
-    <div style="font-size:11px;color:var(--muted);margin-top:8px;">💡 Para arquivos locais, o QR aponta para uma URL que você deve hospedar. Use o link acima para gerar direto.</div>
+    <input type="hidden" id="file-data-url" value="">
   `,
   pptx: `
-    <label>Arquivo PPTX / Apresentação</label>
-    <div style="margin-bottom:12px;">
-      <label style="margin-bottom:4px;">Link para apresentação ou arquivo</label>
-      <input type="url" id="main-input" placeholder="https://exemplo.com/apresentacao.pptx">
+    <div style="margin-bottom:16px;">
+      <label>Opção 1 — Link direto para o PPTX</label>
+      <input type="url" id="main-input" placeholder="https://exemplo.com/apresentacao.pptx" style="margin-top:6px;">
     </div>
-    <div class="file-upload" id="file-zone">
-      <input type="file" id="file-input" accept=".pptx,.ppt,.key">
-      <div class="file-upload-icon">📊</div>
-      <div class="file-upload-text">Arraste ou <strong>clique para escolher</strong> um PPTX</div>
-      <div class="file-display file-name" id="file-display"></div>
+    <div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:12px;">— ou —</div>
+    <div>
+      <label>Opção 2 — Upload do arquivo</label>
+      <div class="file-upload" id="file-zone" style="margin-top:6px;">
+        <input type="file" id="file-input" accept=".pptx,.ppt,.key,.pdf">
+        <div class="file-upload-icon">📊</div>
+        <div class="file-upload-text">Arraste ou <strong>clique para escolher</strong> um PPTX</div>
+        <div class="file-name" id="file-display"></div>
+      </div>
     </div>
+    <input type="hidden" id="file-data-url" value="">
   `,
   email: `
     <label>E-mail do destinatário</label>
@@ -934,8 +942,15 @@ function getVal(id) {
 function getContent() {
   const type = state.type;
 
-  if (type === 'url' || type === 'pdf' || type === 'pptx' || type === 'youtube') {
+  if (type === 'url' || type === 'youtube') {
     return getVal('main-input');
+  }
+  if (type === 'pdf' || type === 'pptx') {
+    const link = getVal('main-input');
+    if (link) return link;
+    // fallback: use stored file data url
+    const fileData = getVal('file-data-url');
+    return fileData || '';
   }
   if (type === 'text') {
     return getVal('main-input');
@@ -994,12 +1009,24 @@ function renderInput(type) {
   if (fi) {
     fi.addEventListener('change', (e) => {
       const f = e.target.files[0];
-      if (f) {
-        const disp = document.getElementById('file-display');
-        if (disp) disp.textContent = '✅ ' + f.name;
-        // For local files, generate a data URL note
-        showToast('📎 Arquivo selecionado. Use o campo de link para gerar o QR.');
-      }
+      if (!f) return;
+      const disp = document.getElementById('file-display');
+      if (disp) disp.textContent = '⏳ Carregando ' + f.name + '...';
+
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = ev.target.result;
+        // Store in hidden field so getContent can read it
+        const hidden = document.getElementById('file-data-url');
+        if (hidden) hidden.value = dataUrl;
+        if (disp) disp.textContent = '✅ ' + f.name + ' pronto!';
+        showToast('📎 Arquivo carregado! Clique em Gerar QR Code.');
+      };
+      reader.onerror = () => {
+        if (disp) disp.textContent = '❌ Erro ao ler arquivo';
+        showToast('❌ Erro ao ler o arquivo.');
+      };
+      reader.readAsDataURL(f);
     });
   }
 }
