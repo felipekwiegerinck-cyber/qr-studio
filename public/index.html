@@ -844,39 +844,24 @@ const typeInputs = {
     <textarea id="main-input" rows="4" placeholder="Digite qualquer texto..."></textarea>
   `,
   pdf: `
-    <div style="margin-bottom:16px;">
-      <label>Opção 1 — Link direto para o PDF</label>
-      <input type="url" id="main-input" placeholder="https://exemplo.com/arquivo.pdf" style="margin-top:6px;">
+    <label>Link direto para o PDF</label>
+    <input type="url" id="main-input" placeholder="https://exemplo.com/arquivo.pdf" style="margin-top:6px; margin-bottom:12px;">
+    <div style="background:rgba(124,106,255,0.08);border:1px solid rgba(124,106,255,0.2);border-radius:10px;padding:14px;font-size:12px;color:var(--muted);line-height:1.6;">
+      💡 <strong style="color:var(--text);">Como usar com arquivos locais:</strong><br>
+      1. Faça upload do PDF no <a href="https://drive.google.com" target="_blank" style="color:var(--accent);">Google Drive</a> ou <a href="https://dropbox.com" target="_blank" style="color:var(--accent);">Dropbox</a><br>
+      2. Copie o link de compartilhamento<br>
+      3. Cole aqui acima e gere o QR ✅
     </div>
-    <div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:12px;">— ou —</div>
-    <div>
-      <label>Opção 2 — Upload do arquivo PDF</label>
-      <div class="file-upload" id="file-zone" style="margin-top:6px;">
-        <input type="file" id="file-input" accept=".pdf">
-        <div class="file-upload-icon">📄</div>
-        <div class="file-upload-text">Arraste ou <strong>clique para escolher</strong> um PDF</div>
-        <div class="file-name" id="file-display"></div>
-      </div>
-      <div style="font-size:11px;color:var(--muted);margin-top:8px;">⚠️ Arquivos grandes podem gerar QR codes densos. Prefira usar um link (Google Drive, Dropbox etc).</div>
-    </div>
-    <input type="hidden" id="file-data-url" value="">
   `,
   pptx: `
-    <div style="margin-bottom:16px;">
-      <label>Opção 1 — Link direto para o PPTX</label>
-      <input type="url" id="main-input" placeholder="https://exemplo.com/apresentacao.pptx" style="margin-top:6px;">
+    <label>Link direto para o PPTX / Apresentação</label>
+    <input type="url" id="main-input" placeholder="https://exemplo.com/apresentacao.pptx" style="margin-top:6px; margin-bottom:12px;">
+    <div style="background:rgba(124,106,255,0.08);border:1px solid rgba(124,106,255,0.2);border-radius:10px;padding:14px;font-size:12px;color:var(--muted);line-height:1.6;">
+      💡 <strong style="color:var(--text);">Como compartilhar sua apresentação:</strong><br>
+      1. Abra no <a href="https://slides.google.com" target="_blank" style="color:var(--accent);">Google Slides</a> ou <a href="https://drive.google.com" target="_blank" style="color:var(--accent);">Google Drive</a><br>
+      2. Clique em Compartilhar → Copiar link<br>
+      3. Cole aqui acima e gere o QR ✅
     </div>
-    <div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:12px;">— ou —</div>
-    <div>
-      <label>Opção 2 — Upload do arquivo</label>
-      <div class="file-upload" id="file-zone" style="margin-top:6px;">
-        <input type="file" id="file-input" accept=".pptx,.ppt,.key,.pdf">
-        <div class="file-upload-icon">📊</div>
-        <div class="file-upload-text">Arraste ou <strong>clique para escolher</strong> um PPTX</div>
-        <div class="file-name" id="file-display"></div>
-      </div>
-    </div>
-    <input type="hidden" id="file-data-url" value="">
   `,
   email: `
     <label>E-mail do destinatário</label>
@@ -1032,9 +1017,27 @@ function renderInput(type) {
 }
 
 // ---- Generate QR ----
+function resetBtn() {
+  const btn = document.getElementById('generate-btn');
+  btn.innerHTML = '✦ Gerar QR Code';
+  btn.disabled = false;
+}
+
 function generateQR() {
-  const content = getContent();
+  let content = getContent();
   if (!content) { showToast('⚠️ Preencha o conteúdo primeiro!'); return; }
+
+  // Arquivo PDF/PPTX não pode virar QR (base64 grande demais)
+  if (content.startsWith('data:')) {
+    showToast('❌ Arquivo grande demais. Use um link (Google Drive, Dropbox) no lugar.');
+    return;
+  }
+
+  // Limite máximo do QR code: ~2953 bytes no modo binário
+  if (content.length > 2953) {
+    showToast('❌ Conteúdo muito longo. Reduza o texto ou use um link curto.');
+    return;
+  }
 
   const btn = document.getElementById('generate-btn');
   btn.innerHTML = '<span class="spinner"></span> Gerando...';
@@ -1061,47 +1064,46 @@ function generateQR() {
       });
 
       setTimeout(() => {
-        let canvas = container.querySelector('canvas');
-        if (!canvas) {
-          const img = container.querySelector('img');
-          if (img) {
-            const c = document.createElement('canvas');
-            c.width = state.size; c.height = state.size;
-            const ctx = c.getContext('2d');
-            ctx.drawImage(img, 0, 0, state.size, state.size);
-            canvas = c;
-          }
-        }
-
-        if (canvas) {
-          // Apply gradient if needed
-          if (state.useGradient) {
-            applyGradient(canvas);
+        try {
+          let canvas = container.querySelector('canvas');
+          if (!canvas) {
+            const img = container.querySelector('img');
+            if (img) {
+              const c = document.createElement('canvas');
+              c.width = state.size; c.height = state.size;
+              const ctx = c.getContext('2d');
+              ctx.drawImage(img, 0, 0, state.size, state.size);
+              canvas = c;
+            }
           }
 
-          // Apply rounded dots if needed
-          if (state.dotShape !== 'square') {
-            applyDotShape(canvas, state.dotShape);
+          if (!canvas) {
+            showToast('❌ Não foi possível gerar o QR. Tente novamente.');
+            resetBtn();
+            return;
           }
 
-          // Apply logo if present
+          if (state.useGradient) applyGradient(canvas);
+          if (state.dotShape !== 'square') applyDotShape(canvas, state.dotShape);
+
           if (state.logoDataUrl) {
-            applyLogo(canvas, state.logoDataUrl, () => {
-              finishQR(container, canvas);
-            });
+            applyLogo(canvas, state.logoDataUrl, () => { finishQR(container, canvas); resetBtn(); });
           } else {
             finishQR(container, canvas);
+            resetBtn();
           }
+        } catch(e) {
+          console.error('Erro interno:', e);
+          showToast('❌ Erro ao processar QR. Tente conteúdo mais curto.');
+          resetBtn();
         }
-      }, 200);
+      }, 300);
 
     } catch(e) {
+      console.error('Erro ao criar QR:', e);
       showToast('❌ Erro ao gerar QR. Verifique o conteúdo.');
-      console.error(e);
+      resetBtn();
     }
-
-    btn.innerHTML = '✦ Gerar QR Code';
-    btn.disabled = false;
   }, 100);
 }
 
